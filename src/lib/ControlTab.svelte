@@ -1,6 +1,7 @@
 <script lang="ts">
   import _ from "lodash";
   import { getRandomColor } from "../utils";
+  import { dndzone } from 'svelte-dnd-action';
 
   export let percent: number;
   export let playing: boolean;
@@ -80,52 +81,31 @@
       </div>
     </div>
 
-    {#each lines as line, idx}
-      <div class="flex flex-col w-full justify-start items-start gap-1">
-        <div class="flex flex-row w-full justify-between">
-          <div
-            class="font-semibold flex flex-row justify-start items-center gap-2"
-          >
-            <p>Line {idx + 1}</p>
+    <div class="flex flex-col w-full justify-start items-start gap-0.5" use:dndzone={{ items: lines, flipDuration: 300 }}>
+      <div class="font-semibold">Lines</div>
+      {#each lines as line, idx (line.id)}
+        <div class="flex flex-col w-full justify-start items-start gap-1" data-dnd-item>
+          <div class="flex flex-row w-full justify-between">
             <div
-              class="size-2.5 rounded-full shadow-md"
-              style={`background: ${line.color}`}
-            />
-          </div>
-          <div class="flex flex-row justify-end items-center gap-1">
-            <button
-              title="Add Control Point"
-              on:click={() => {
-                line.controlPoints = [
-                  ...line.controlPoints,
-                  {
-                    x: _.random(36, 108),
-                    y: _.random(36, 108),
-                  },
-                ];
-              }}
+              class="font-semibold flex flex-row justify-start items-center gap-2"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width={2}
-                class="size-5 stroke-green-500"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 4.5v15m7.5-7.5h-15"
-                />
-              </svg>
-            </button>
-            {#if lines.length > 1}
+              <p>Line {idx + 1}</p>
+              <div
+                class="size-2.5 rounded-full shadow-md"
+                style={`background: ${line.color}`}
+              />
+            </div>
+            <div class="flex flex-row justify-end items-center gap-1">
               <button
-                title="Remove Line"
+                title="Add Control Point"
                 on:click={() => {
-                  let _lns = lines;
-                  lines.splice(idx, 1);
-                  lines = _lns;
+                  line.controlPoints = [
+                    ...line.controlPoints,
+                    {
+                      x: _.random(36, 108),
+                      y: _.random(36, 108),
+                    },
+                  ];
                 }}
               >
                 <svg
@@ -133,110 +113,19 @@
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke-width={2}
-                  class="size-5 stroke-red-500"
+                  class="size-5 stroke-green-500"
                 >
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    d="M12 4.5v15m7.5-7.5h-15"
                   />
                 </svg>
               </button>
-            {/if}
-          </div>
-        </div>
-        <div class={`h-[0.75px] w-full`} style={`background: ${line.color}`} />
-        <div class="flex flex-col justify-start items-start">
-          <div class="font-light">End Point:</div>
-          <div class="flex flex-row justify-start items-center gap-2">
-            <div class="font-extralight">X:</div>
-            <input
-              class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
-              step="0.1"
-              type="number"
-              min="0"
-              max="144"
-              bind:value={line.endPoint.x}
-            />
-            <div class="font-extralight">Y:</div>
-            <input
-              class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
-              step="0.1"
-              min="0"
-              max="144"
-              type="number"
-              bind:value={line.endPoint.y}
-            />
-
-            <select
-              bind:value={line.endPoint.heading}
-              class=" rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28 text-sm"
-            >
-              <option value="constant">Constant</option>
-              <option value="linear">Linear</option>
-              <option value="tangential">Tangential</option>
-            </select>
-
-            {#if line.endPoint.heading === "linear"}
-              <input
-                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
-                step="1"
-                type="number"
-                min="-180"
-                max="180"
-                bind:value={line.endPoint.startDeg}
-              />
-              <input
-                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
-                step="1"
-                type="number"
-                min="-180"
-                max="180"
-                bind:value={line.endPoint.endDeg}
-              />
-            {:else if line.endPoint.heading === "constant"}
-              <input
-                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
-                step="1"
-                type="number"
-                min="-180"
-                max="180"
-                bind:value={line.endPoint.degrees}
-              />
-            {:else if line.endPoint.heading === "tangential"}
-              <p class="text-sm font-extralight">Reverse:</p>
-              <input type="checkbox" bind:checked={line.endPoint.reverse} />
-            {/if}
-          </div>
-        </div>
-        {#each line.controlPoints as point, idx1}
-          <div class="flex flex-col justify-start items-start">
-            <div class="font-light">Control Point {idx1 + 1}:</div>
-            <div class="flex flex-row justify-start items-center gap-2">
-              <div class="font-extralight">X:</div>
-              <input
-                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
-                step="0.1"
-                type="number"
-                bind:value={point.x}
-                min="0"
-                max="144"
-              />
-              <div class="font-extralight">Y:</div>
-              <input
-                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
-                step="0.1"
-                type="number"
-                bind:value={point.y}
-                min="0"
-                max="144"
-              />
               <button
-                title="Remove Control Point"
+                title="Remove Line"
                 on:click={() => {
-                  let _pts = line.controlPoints;
-                  _pts.splice(idx1, 1);
-                  line.controlPoints = _pts;
+                  lines.splice(idx, 1);
                 }}
               >
                 <svg
@@ -255,9 +144,120 @@
               </button>
             </div>
           </div>
-        {/each}
-      </div>
-    {/each}
+          <div class={`h-[0.75px] w-full`} style={`background: ${line.color}`} />
+          <div class="flex flex-col justify-start items-start">
+            <div class="font-light">End Point:</div>
+            <div class="flex flex-row justify-start items-center gap-2">
+              <div class="font-extralight">X:</div>
+              <input
+                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
+                step="0.1"
+                type="number"
+                min="0"
+                max="144"
+                bind:value={line.endPoint.x}
+              />
+              <div class="font-extralight">Y:</div>
+              <input
+                class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
+                step="0.1"
+                min="0"
+                max="144"
+                type="number"
+                bind:value={line.endPoint.y}
+              />
+
+              <select
+                bind:value={line.endPoint.heading}
+                class=" rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28 text-sm"
+              >
+                <option value="constant">Constant</option>
+                <option value="linear">Linear</option>
+                <option value="tangential">Tangential</option>
+              </select>
+
+              {#if line.endPoint.heading === "linear"}
+                <input
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
+                  step="1"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  bind:value={line.endPoint.startDeg}
+                />
+                <input
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
+                  step="1"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  bind:value={line.endPoint.endDeg}
+                />
+              {:else if line.endPoint.heading === "constant"}
+                <input
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-14"
+                  step="1"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  bind:value={line.endPoint.degrees}
+                />
+              {:else if line.endPoint.heading === "tangential"}
+                <p class="text-sm font-extralight">Reverse:</p>
+                <input type="checkbox" bind:checked={line.endPoint.reverse} />
+              {/if}
+            </div>
+          </div>
+          {#each line.controlPoints as point, idx1}
+            <div class="flex flex-col justify-start items-start">
+              <div class="font-light">Control Point {idx1 + 1}:</div>
+              <div class="flex flex-row justify-start items-center gap-2">
+                <div class="font-extralight">X:</div>
+                <input
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
+                  step="0.1"
+                  type="number"
+                  bind:value={point.x}
+                  min="0"
+                  max="144"
+                />
+                <div class="font-extralight">Y:</div>
+                <input
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
+                  step="0.1"
+                  type="number"
+                  bind:value={point.y}
+                  min="0"
+                  max="144"
+                />
+                <button
+                  title="Remove Control Point"
+                  on:click={() => {
+                    let _pts = line.controlPoints;
+                    _pts.splice(idx1, 1);
+                    line.controlPoints = _pts;
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width={2}
+                    class="size-5 stroke-red-500"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/each}
+    </div>
     <button
       on:click={() => {
         lines = [
