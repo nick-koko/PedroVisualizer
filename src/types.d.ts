@@ -31,6 +31,7 @@ type Point = BasePoint &
 type ControlPoint = BasePoint;
 
 interface Line {
+  id: string;
   endPoint: Point;
   controlPoints: ControlPoint[];
   color: string;

@@ -20,16 +20,11 @@ export function easeInOutQuad(x: number): number {
   return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 }
 
-export function getMousePos(evt: MouseEvent, canvas: any) {
-  let rect = canvas.getBoundingClientRect();
-  return {
-    x:
-      ((evt.clientX - rect.left) / (rect.right - rect.left)) *
-      canvas.width.baseVal.value,
-    y:
-      ((evt.clientY - rect.top) / (rect.bottom - rect.top)) *
-      canvas.height.baseVal.value,
-  };
+export function getMousePos(evt: MouseEvent, element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const x = evt.clientX - rect.left;
+  const y = evt.clientY - rect.top;
+  return { x, y };
 }
 
 export function vh(percent: number) {

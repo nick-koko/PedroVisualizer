@@ -88,7 +88,7 @@ ${line.endPoint.reverse ? ".setReversed(true)" : ""}
 
       public static PathBuilder builder = new PathBuilder();
 
-        public static PathChain paths = builder${lines
+      public static PathChain paths = builder${lines
               .map(
                       (line, idx) => `.addPath(  // Line ${idx + 1}
               ${line.controlPoints.length === 0 ? `new BezierLine` : `new BezierCurve`}(
@@ -110,10 +110,10 @@ ${line.endPoint.reverse ? ".setReversed(true)" : ""}
                 new Point(${line.endPoint.x.toFixed(3)}, ${line.endPoint.y.toFixed(3)}, Point.CARTESIAN)
               )
             ).${headingTypeToFunctionName[line.endPoint.heading]}(${line.endPoint.heading === "constant" ? `Math.toRadians(${line.endPoint.degrees})` : line.endPoint.heading === "linear" ? `Math.toRadians(${line.endPoint.startDeg}), Math.toRadians(${line.endPoint.endDeg})` : ""})
-            ${line.endPoint.reverse ? ".setReversed(true)" : ""}
-          .build();`
+            ${line.endPoint.reverse ? ".setReversed(true)" : ""}`
               )
-              .join("\n")};
+              .join("\n")}
+          .build();
 
     }
     `;

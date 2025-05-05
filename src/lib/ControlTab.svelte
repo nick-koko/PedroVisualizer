@@ -30,6 +30,9 @@
           type="number"
           class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-16"
           step="1"
+          min="1"
+          max="144"
+          on:input={() => robotWidth = Number(robotWidth)}
         />
         <div class="font-extralight">Robot Height:</div>
         <input
@@ -37,6 +40,9 @@
           type="number"
           class="pl-1.5 rounded-md bg-neutral-100 border-[0.5px] focus:outline-none w-16 dark:bg-neutral-950 dark:border-neutral-700"
           step="1"
+          min="1"
+          max="144"
+          on:input={() => robotHeight = Number(robotHeight)}
         />
       </div>
     </div>
@@ -81,7 +87,14 @@
       </div>
     </div>
 
-    <div class="flex flex-col w-full justify-start items-start gap-0.5" use:dndzone={{ items: lines, flipDuration: 300 }}>
+    <div class="flex flex-col w-full justify-start items-start gap-0.5" 
+         use:dndzone={{ 
+           items: lines,
+           flipDurationMs: 300,
+           dragDisabled: false,
+           morphDisabled: false,
+           dropFromOthersDisabled: false
+         }}>
       <div class="font-semibold">Lines</div>
       {#each lines as line, idx (line.id)}
         <div class="flex flex-col w-full justify-start items-start gap-1" data-dnd-item>
@@ -263,6 +276,7 @@
         lines = [
           ...lines,
           {
+            id: `line-${lines.length + 1}`,
             endPoint: {
               x: _.random(0, 144),
               y: _.random(0, 144),
