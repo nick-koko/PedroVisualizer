@@ -35,4 +35,8 @@ interface Line {
   endPoint: Point;
   controlPoints: ControlPoint[];
   color: string;
+  group: number;  // Group number for pathchain generation
+  groupName: string;  // Name of the group for display and code generation
+  name: string;  // Name of the line for display and code comments
+  groupColor: string; // Primary color for the pathchain group
 }

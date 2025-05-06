@@ -16,6 +16,7 @@
   export let loadRobot: (evt: any) => any;
 
   let separateLines = false;
+  let groupByGroups = false;
   export let startPoint: Point;
   export let lines: Line[];
 
@@ -46,7 +47,62 @@
 
     let file = ``;
 
-    if(separateLines) {
+    if (groupByGroups) {
+      const groups: Line[][] = [];
+      let currentGroup: Line[] = [];
+
+      lines.forEach((line, idx) => {
+        // Start a new group if it's the first line or if this line starts a new pathchain
+        if (idx === 0 || lines[idx - 1].group !== line.group) {
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+          }
+          currentGroup = [line];
+        } else {
+          currentGroup.push(line);
+        }
+      });
+      
+      // Add the last group
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+
+      file = `
+    public class GeneratedPaths {
+
+    public static PathBuilder builder = new PathBuilder();
+
+${groups.map((groupLines) => `public static PathChain ${groupLines[0].groupName} = builder${groupLines
+              .map(
+                      (line, idx) => `.addPath(  // ${line.name}
+              ${line.controlPoints.length === 0 ? `new BezierLine` : `new BezierCurve`}(
+                ${
+                              idx === 0
+                                      ? `new Point(${startPoint.x.toFixed(3)}, ${startPoint.y.toFixed(3)}, Point.CARTESIAN),`
+                                      : `new Point(${groupLines[idx - 1].endPoint.x.toFixed(3)}, ${groupLines[idx - 1].endPoint.y.toFixed(3)}, Point.CARTESIAN),`
+                      }
+                ${
+                              line.controlPoints.length > 0
+                                      ? `${line.controlPoints
+                                              .map(
+                                                      (point) =>
+                                                              `new Point(${point.x.toFixed(3)}, ${point.y.toFixed(3)}, Point.CARTESIAN)`
+                                              )
+                                              .join(",\n")},`
+                                      : ""
+                      }
+                new Point(${line.endPoint.x.toFixed(3)}, ${line.endPoint.y.toFixed(3)}, Point.CARTESIAN)
+              )
+            ).${headingTypeToFunctionName[line.endPoint.heading]}(${line.endPoint.heading === "constant" ? `Math.toRadians(${line.endPoint.degrees})` : line.endPoint.heading === "linear" ? `Math.toRadians(${line.endPoint.startDeg}), Math.toRadians(${line.endPoint.endDeg})` : ""})
+            ${line.endPoint.reverse ? ".setReversed(true)" : ""}`
+              )
+              .join("\n")}
+          .build();`).join("\n\n")};
+
+    }
+    `;
+    } else if(separateLines) {
       file = `
     public class GeneratedPaths {
 
@@ -220,9 +276,13 @@ ${line.endPoint.reverse ? ".setReversed(true)" : ""}
   };
   lines = [
     {
+      id: "line-1",
       endPoint: { x: 36, y: 80, heading: "linear", startDeg: 0, endDeg: 0 },
       controlPoints: [],
       color: getRandomColor(),
+      group: 1,
+      groupName: "Group1",
+      name: "Line 1"
     },
   ];
       }}
@@ -333,7 +393,21 @@ ${line.endPoint.reverse ? ".setReversed(true)" : ""}
                   id="separate-lines"
                   type="checkbox"
                   bind:checked={separateLines}
-                  on:change={exportToCode}
+                  on:change={() => {
+                    if (separateLines) groupByGroups = false;
+                    exportToCode();
+                  }}
+                  class="cursor-pointer"
+          />
+          <label for="group-by-groups" class="text-sm font-light text-neutral-700 dark:text-neutral-400">Group by Groups</label>
+          <input
+                  id="group-by-groups"
+                  type="checkbox"
+                  bind:checked={groupByGroups}
+                  on:change={() => {
+                    if (groupByGroups) separateLines = false;
+                    exportToCode();
+                  }}
                   class="cursor-pointer"
           />
           <button

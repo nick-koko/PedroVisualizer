@@ -15,6 +15,9 @@
   export let robotHeading: number;
   export let x: d3.ScaleLinear<number, number, number>;
   export let y: d3.ScaleLinear<number, number, number>;
+  export let maxSpeed: number;
+  export let maxAccel: number;
+  export let addNewLine: () => void;
 </script>
 
 <div class="flex-1 flex flex-col justify-start items-center gap-2 h-full">
@@ -43,6 +46,28 @@
           min="1"
           max="144"
           on:input={() => robotHeight = Number(robotHeight)}
+        />
+      </div>
+      <div class="flex flex-row justify-start items-center gap-2 mt-2">
+        <div class="font-extralight">Max Speed (in/s):</div>
+        <input
+          bind:value={maxSpeed}
+          type="number"
+          class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-20"
+          step="0.1"
+          min="0.1"
+          max="100"
+          on:input={() => maxSpeed = Number(maxSpeed)}
+        />
+        <div class="font-extralight">Max Accel (in/s²):</div>
+        <input
+          bind:value={maxAccel}
+          type="number"
+          class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-20"
+          step="0.1"
+          min="0.1"
+          max="100"
+          on:input={() => maxAccel = Number(maxAccel)}
         />
       </div>
     </div>
@@ -95,18 +120,68 @@
            morphDisabled: false,
            dropFromOthersDisabled: false
          }}>
-      <div class="font-semibold">Lines</div>
       {#each lines as line, idx (line.id)}
-        <div class="flex flex-col w-full justify-start items-start gap-1" data-dnd-item>
+        {@const isNewGroup = idx === 0 || lines[idx - 1].group !== line.group}
+        {@const currentGroup = lines.slice(0, idx + 1).filter((l, i) => i === 0 || lines[i - 1].group !== l.group).length - 1}
+        <div class="flex flex-col w-full justify-start items-start gap-1" 
+             data-dnd-item
+             class:mt-6={idx > 0 && isNewGroup}>
           <div class="flex flex-row w-full justify-between">
-            <div
-              class="font-semibold flex flex-row justify-start items-center gap-2"
-            >
-              <p>Line {idx + 1}</p>
-              <div
-                class="size-2.5 rounded-full shadow-md"
-                style={`background: ${line.color}`}
-              />
+            <div class="flex flex-row items-center gap-2">
+              {#if isNewGroup}
+                <div class="w-1 h-8 rounded-full"
+                     class:bg-blue-400={currentGroup % 4 === 0}
+                     class:bg-green-400={currentGroup % 4 === 1}
+                     class:bg-purple-400={currentGroup % 4 === 2}
+                     class:bg-orange-400={currentGroup % 4 === 3}
+                     class:dark:bg-blue-500={currentGroup % 4 === 0}
+                     class:dark:bg-green-500={currentGroup % 4 === 1}
+                     class:dark:bg-purple-500={currentGroup % 4 === 2}
+                     class:dark:bg-orange-500={currentGroup % 4 === 3}>
+                </div>
+              {:else}
+                <div class="w-1"></div>
+              {/if}
+              <div class="font-semibold flex flex-row justify-start items-center gap-2">
+                <input
+                  type="text"
+                  bind:value={line.name}
+                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-32"
+                  placeholder={`Line ${idx + 1}`}
+                />
+                <div
+                  class="size-2.5 rounded-full shadow-md"
+                  style={`background: ${line.color}`}
+                />
+                <div class="flex flex-row items-center gap-1">
+                  <label class="text-sm font-light flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={idx === 0 || lines[idx - 1].group !== line.group}
+                      on:change={(e) => {
+                        const target = e.target;
+                        if (target instanceof HTMLInputElement && target.checked) {
+                          line.group = lines[idx - 1]?.group + 1 || 1;
+                          line.groupName = `Group${line.group}`;
+                        } else {
+                          line.group = lines[idx - 1]?.group || 1;
+                          line.groupName = `Group${line.group}`;
+                        }
+                      }}
+                      class="cursor-pointer"
+                    />
+                    New Pathchain
+                  </label>
+                  {#if idx === 0 || lines[idx - 1].group !== line.group}
+                    <input
+                      type="text"
+                      bind:value={line.groupName}
+                      class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-24"
+                      placeholder={`Group${line.group}`}
+                    />
+                  {/if}
+                </div>
+              </div>
             </div>
             <div class="flex flex-row justify-end items-center gap-1">
               <button
@@ -139,6 +214,7 @@
                 title="Remove Line"
                 on:click={() => {
                   lines.splice(idx, 1);
+                  lines = [...lines];
                 }}
               >
                 <svg
@@ -158,7 +234,7 @@
             </div>
           </div>
           <div class={`h-[0.75px] w-full`} style={`background: ${line.color}`} />
-          <div class="flex flex-col justify-start items-start">
+          <div class="flex flex-col justify-start items-start ml-8">
             <div class="font-light">End Point:</div>
             <div class="flex flex-row justify-start items-center gap-2">
               <div class="font-extralight">X:</div>
@@ -222,7 +298,7 @@
             </div>
           </div>
           {#each line.controlPoints as point, idx1}
-            <div class="flex flex-col justify-start items-start">
+            <div class="flex flex-col justify-start items-start ml-8">
               <div class="font-light">Control Point {idx1 + 1}:</div>
               <div class="flex flex-row justify-start items-center gap-2">
                 <div class="font-extralight">X:</div>
@@ -236,7 +312,8 @@
                 />
                 <div class="font-extralight">Y:</div>
                 <input
-                  class="pl-1.5 rounded-md bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
+                  class="pl-1.5 round
+                  d bg-neutral-100 dark:bg-neutral-950 dark:border-neutral-700 border-[0.5px] focus:outline-none w-28"
                   step="0.1"
                   type="number"
                   bind:value={point.y}
@@ -272,22 +349,7 @@
       {/each}
     </div>
     <button
-      on:click={() => {
-        lines = [
-          ...lines,
-          {
-            id: `line-${lines.length + 1}`,
-            endPoint: {
-              x: _.random(0, 144),
-              y: _.random(0, 144),
-              heading: "tangential",
-              reverse: false,
-            },
-            controlPoints: [],
-            color: getRandomColor(),
-          },
-        ];
-      }}
+      on:click={addNewLine}
       class="font-semibold text-green-500 text-sm flex flex-row justify-start items-center gap-1"
     >
       <svg

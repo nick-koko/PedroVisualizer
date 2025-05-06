@@ -23,8 +23,10 @@
 
   let pointRadius = 1.15;
   let lineWidth = 0.57;
-  let robotWidth = 24;
-  let robotHeight = 24;
+  let robotWidth = 17;
+  let robotHeight = 17;
+  let maxSpeed = 30; // Default max speed in inches per second
+  let maxAccel = 20; // Default max acceleration in inches per second squared
 
   let percent: number = 0;
 
@@ -94,12 +96,34 @@
   let pointGroup = new Two.Group();
   pointGroup.id = "point-group";
 
+  // Fixed color palette for pathchains
+  const pathchainPalette = [
+    'hsl(220, 80%, 45%)', // Blue
+    'hsl(140, 70%, 40%)', // Green
+    'hsl(270, 60%, 55%)', // Purple
+    'hsl(30, 90%, 55%)',  // Orange
+    'hsl(0, 80%, 55%)',   // Red
+    'hsl(180, 70%, 45%)', // Teal
+    'hsl(50, 90%, 55%)',  // Yellow
+    'hsl(320, 70%, 55%)', // Pink
+  ];
+
   let lines: Line[] = [
     {
-      id: 'line-1',
-      endPoint: { x: 36, y: 80, heading: "linear", startDeg: 0, endDeg: 0 },
+      id: "line-1",
+      endPoint: {
+        x: 72,
+        y: 72,
+        heading: "linear",
+        startDeg: 0,
+        endDeg: 90,
+      },
       controlPoints: [],
-      color: getRandomColor(),
+      color: pathchainPalette[0],
+      group: 1,  // Default to group 1
+      groupColor: pathchainPalette[0],
+      groupName: "Group1",  // Default group name
+      name: "Line 1"  // Default line name
     },
   ];
 
@@ -245,10 +269,13 @@
     let totalLineProgress = (lines.length * Math.min(percent, 99.999999999)) / 100;
     let currentLineIdx = Math.min(Math.trunc(totalLineProgress), lines.length - 1);
     let currentLine = lines[currentLineIdx];
-
-    let linePercent = easeInOutQuad(totalLineProgress - Math.floor(totalLineProgress));
+    
+    // Calculate progress within the current line
+    let lineProgress = totalLineProgress - currentLineIdx;
+    lineProgress = Math.max(0, Math.min(1, lineProgress));
+    
     let _startPoint = currentLineIdx === 0 ? startPoint : lines[currentLineIdx - 1].endPoint;
-    let robotInchesXY = getCurvePoint(linePercent, [_startPoint, ...currentLine.controlPoints, currentLine.endPoint]);
+    let robotInchesXY = getCurvePoint(lineProgress, [_startPoint, ...currentLine.controlPoints, currentLine.endPoint]);
     robotXY = { x: x(robotInchesXY.x), y: y(robotInchesXY.y) };
 
     switch (currentLine.endPoint.heading) {
@@ -256,7 +283,7 @@
         robotHeading = -shortestRotation(
           currentLine.endPoint.startDeg,
           currentLine.endPoint.endDeg,
-          linePercent
+          lineProgress
         );
         break;
       case "constant":
@@ -264,7 +291,7 @@
         break;
       case "tangential":
         const nextPointInches = getCurvePoint(
-          linePercent + (currentLine.endPoint.reverse ? -0.01 : 0.01),
+          lineProgress + (currentLine.endPoint.reverse ? -0.01 : 0.01),
           [_startPoint, ...currentLine.controlPoints, currentLine.endPoint]
         );
         const nextPoint = { x: x(nextPointInches.x), y: y(nextPointInches.y) };
@@ -274,30 +301,28 @@
 
         if (dx !== 0 || dy !== 0) {
           const angle = Math.atan2(dy, dx);
-
           robotHeading = radiansToDegrees(angle);
         }
-
         break;
     }
   }
 
   $: if (two) {
-    console.log('Updating canvas with paths:', path.length);
+    //console.log('Updating canvas with paths:', path.length);
     two.clear();
     path.forEach(p => {
-      console.log('Adding path:', p.id, 'visible:', p.visible, 'opacity:', p.opacity);
+      //console.log('Adding path:', p.id, 'visible:', p.visible, 'opacity:', p.opacity);
       two.add(p);
     });
     points.forEach(p => {
-      console.log('Adding point:', p.id, 'visible:', p.visible);
+      console.log('Adding point:'); //, p.id, 'visible:', p.visible);
       two.add(p);
     });
     two.update();
   }
 
   let playing = false;
-
+  let isPaused = false;
   let animationFrame: number;
   let startTime: number | null = null;
   let previousTime: number | null = null;
@@ -305,19 +330,68 @@
   function animate(timestamp: number) {
     if (!startTime) {
       startTime = timestamp;
+      previousTime = timestamp;
+      requestAnimationFrame(animate);
+      return;
     }
 
-    if (previousTime !== null) {
-      const deltaTime = timestamp - previousTime;
+    const deltaTime = timestamp - previousTime!;
+    previousTime = timestamp;
 
-      if (percent >= 100) {
-        percent = 0;
+    if (playing && !isPaused) {
+      // Calculate current line length in inches
+      let currentLineIdx = Math.trunc((lines.length * percent) / 100);
+      let currentLine = lines[currentLineIdx];
+      let _startPoint = currentLineIdx === 0 ? startPoint : lines[currentLineIdx - 1].endPoint;
+      
+      // Calculate current line length
+      const dx = currentLine.endPoint.x - _startPoint.x;
+      const dy = currentLine.endPoint.y - _startPoint.y;
+      const currentLineLength = Math.sqrt(dx * dx + dy * dy);
+
+      // Calculate distance to travel this frame in inches
+      const distanceThisFrame = (maxSpeed * deltaTime) / 1000; // Convert to inches per frame
+      
+      // Calculate progress within current line
+      let lineProgress = (lines.length * percent) / 100 - currentLineIdx;
+      lineProgress = Math.max(0, Math.min(1, lineProgress));
+      
+      // Calculate current distance along the line
+      const currentDistance = lineProgress * currentLineLength;
+      
+      // Calculate new distance
+      const newDistance = currentDistance + distanceThisFrame;
+      
+      // Convert back to percentage of the line
+      const newLineProgress = newDistance / currentLineLength;
+      
+      // Convert back to total percentage
+      const newPercent = ((currentLineIdx + newLineProgress) / lines.length) * 100;
+
+      // Check if we're at the end of a group
+      let currentGroup = currentLine.group;
+      let nextLineIdx = currentLineIdx + 1;
+      let isEndOfGroup = nextLineIdx >= lines.length || lines[nextLineIdx].group !== currentGroup;
+
+      if (isEndOfGroup && newLineProgress >= 1) {
+        isPaused = true;
+        percent = ((currentLineIdx + 1) / lines.length) * 100; // Set to exact end of current line
+        setTimeout(() => {
+          isPaused = false;
+          if (playing) {
+            percent = Math.min(100, newPercent);
+            if (percent >= 100) {
+              percent = 0;
+            }
+          }
+        }, 500);
       } else {
-        percent += (0.65 / lines.length) * (deltaTime * 0.1);
+        percent = newPercent;
+        if (percent >= 100) {
+          percent = 0;
+        }
       }
     }
-
-    previousTime = timestamp;
 
     if (playing) {
       requestAnimationFrame(animate);
@@ -327,15 +401,28 @@
   function play() {
     if (!playing) {
       playing = true;
+      isPaused = false;
       startTime = null;
       previousTime = null;
+      percent = 0; // Always start from beginning
       animationFrame = requestAnimationFrame(animate);
     }
   }
 
   function pause() {
     playing = false;
-    cancelAnimationFrame(animationFrame);
+    isPaused = false;
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    }
+  }
+
+  // Add a function to handle manual slider changes
+  function handleSliderChange() {
+    if (playing) {
+      pause();
+    }
   }
 
   onMount(() => {
@@ -438,14 +525,7 @@
       if (elem?.id.startsWith("point")) {
         currentElem = elem.id;
       } else {
-        // Add new point on click
-        const { x: xPos, y: yPos } = getMousePos(evt, twoElement);
-        const lastLine = lines[lines.length - 1];
-        lastLine.controlPoints.push({
-          x: x.invert(xPos),
-          y: y.invert(yPos)
-        });
-        lines = [...lines]; // Trigger reactivity
+        // Do nothing on field click (no point addition)
       }
     }
 
@@ -576,6 +656,38 @@
     URL.revokeObjectURL(url);
   }
 
+  function getColorVariation(baseColor: string, index: number, totalInGroup: number) {
+    // Parse the HSL color
+    const match = baseColor.match(/hsl\((\d+),\s*(\d+)%?,\s*(\d+)%?\)/);
+    if (!match) return baseColor.startsWith('hsl') ? baseColor : 'hsl(220, 80%, 45%)'; // fallback to blue if not HSL
+    const [_, hue, saturation, lightness] = match;
+    // Make each subsequent line lighter by increasing lightness
+    const newLightness = Math.min(90, parseInt(lightness) + (index * (40 / totalInGroup)));
+    return `hsl(${hue}, ${saturation}%, ${newLightness}%)`;
+  }
+
+  function updateLineColors() {
+    console.log('[updateLineColors] lines array length:', lines.length, 'lines:', lines.map(l => ({id: l.id, group: l.group, color: l.color})));
+    // Map of group number to palette index
+    let groupNumbers = Array.from(new Set(lines.map(line => line.group)));
+    groupNumbers.sort((a, b) => a - b);
+    let groupToPaletteIndex = new Map<number, number>();
+    groupNumbers.forEach((group, idx) => {
+      groupToPaletteIndex.set(group, idx % pathchainPalette.length);
+    });
+
+    // For each group, assign groupColor and color variations
+    groupNumbers.forEach(group => {
+      const groupLines = lines.filter(line => line.group === group);
+      const groupColor = pathchainPalette[groupToPaletteIndex.get(group)!];
+      groupLines.forEach((line, idx) => {
+        line.groupColor = groupColor;
+        line.color = getColorVariation(groupColor, idx, groupLines.length);
+        console.log(`[updateLineColors] group: ${group}, idx: ${idx}, id: ${line.id}, color: ${line.color}`);
+      });
+    });
+  }
+
   function loadFile(evt: Event) {
     const elem = evt.target as HTMLInputElement;
     const file = elem.files?.[0];
@@ -600,6 +712,8 @@
 
           startPoint = jsonObj.startPoint;
           lines = jsonObj.lines;
+          updateLineColors(); // Ensure colors are recalculated after loading
+          console.log('[loadFile] Lines after loading and color update:', lines.map(l => ({id: l.id, group: l.group, color: l.color})));
         } catch (err) {
           console.error(err);
         }
@@ -636,6 +750,21 @@
   }
 
   function addNewLine() {
+    // Get the current group number
+    const currentGroup = lines.length > 0 ? lines[lines.length - 1].group : 1;
+    // Count how many lines are in the current group
+    const linesInGroup = lines.filter(line => line.group === currentGroup).length;
+    // If this is the first line in a group, pick the next color from the palette
+    let groupColor;
+    if (linesInGroup === 0) {
+      const groupIndex = (currentGroup - 1) % pathchainPalette.length;
+      groupColor = pathchainPalette[groupIndex];
+    } else {
+      const groupFirstLine = lines.find(line => line.group === currentGroup);
+      groupColor = groupFirstLine!.groupColor;
+    }
+    // Use a variation for each line in the group
+    let color = getColorVariation(groupColor, linesInGroup, 5); // 5 is a reasonable default
     lines = [
       ...lines,
       {
@@ -647,9 +776,15 @@
           reverse: false,
         },
         controlPoints: [],
-        color: getRandomColor(),
+        color: color,
+        group: currentGroup,
+        groupColor: groupColor,
+        groupName: `Group${currentGroup}`,
+        name: `Line ${lines.length + 1}`
       },
     ];
+    console.log('[addNewLine] lines array after push:', lines.map(l => ({id: l.id, group: l.group, color: l.color})));
+    updateLineColors();
   }
 
   function addControlPoint() {
@@ -659,12 +794,13 @@
         x: _.random(36, 108),
         y: _.random(36, 108),
       });
-    }
+      }
+      console.log('Add Control Point');
   }
 
   function removeControlPoint() {
     if (lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
+      const lastLine = lines[lines.length - 1]; 
       if (lastLine.controlPoints.length > 0) {
         lastLine.controlPoints.pop();
       }
@@ -687,6 +823,9 @@
     removeControlPoint();
     two.update();
   });
+
+  // Call updateLineColors whenever lines change
+  $: updateLineColors();
 </script>
 
 <Navbar bind:lines bind:startPoint {saveFile} {loadFile} {loadRobot}/>
@@ -721,9 +860,13 @@
     bind:robotWidth
     bind:robotHeight
     bind:percent
+    on:input={handleSliderChange}
     bind:robotXY
     bind:robotHeading
+    bind:maxSpeed
+    bind:maxAccel
     {x}
     {y}
+    {addNewLine}
   />
 </div>
