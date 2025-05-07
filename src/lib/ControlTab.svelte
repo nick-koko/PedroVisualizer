@@ -18,6 +18,41 @@
   export let maxSpeed: number;
   export let maxAccel: number;
   export let addNewLine: () => void;
+  export let updateLineColors: () => void;
+
+  // Use the same palette as App.svelte
+  const pathchainPalette = [
+    'hsl(220, 80%, 45%)', // Blue
+    'hsl(140, 70%, 40%)', // Green
+    'hsl(270, 60%, 55%)', // Purple
+    'hsl(30, 90%, 55%)',  // Orange
+    'hsl(0, 80%, 55%)',   // Red
+    'hsl(180, 70%, 45%)', // Teal
+    'hsl(50, 90%, 55%)',  // Yellow
+    'hsl(320, 70%, 55%)', // Pink
+  ];
+
+  // Add Line After function
+  function addLineAfter(idx: number) {
+    const line = lines[idx];
+    const newLine = {
+      id: `line-${lines.length + 1}`,
+      endPoint: {
+        x: _.random(0, 144),
+        y: _.random(0, 144),
+        heading: 'tangential' as 'tangential',
+        reverse: false,
+      },
+      controlPoints: [],
+      color: line.color,
+      group: line.group,
+      groupColor: line.groupColor,
+      groupName: line.groupName,
+      name: `Line ${lines.length + 1}`
+    };
+    lines.splice(idx + 1, 0, newLine);
+    lines = [...lines];
+  }
 </script>
 
 <div class="flex-1 flex flex-col justify-start items-center gap-2 h-full">
@@ -130,14 +165,7 @@
             <div class="flex flex-row items-center gap-2">
               {#if isNewGroup}
                 <div class="w-1 h-8 rounded-full"
-                     class:bg-blue-400={currentGroup % 4 === 0}
-                     class:bg-green-400={currentGroup % 4 === 1}
-                     class:bg-purple-400={currentGroup % 4 === 2}
-                     class:bg-orange-400={currentGroup % 4 === 3}
-                     class:dark:bg-blue-500={currentGroup % 4 === 0}
-                     class:dark:bg-green-500={currentGroup % 4 === 1}
-                     class:dark:bg-purple-500={currentGroup % 4 === 2}
-                     class:dark:bg-orange-500={currentGroup % 4 === 3}>
+                     style="background: {pathchainPalette[currentGroup % pathchainPalette.length]};">
                 </div>
               {:else}
                 <div class="w-1"></div>
@@ -167,6 +195,7 @@
                           line.group = lines[idx - 1]?.group || 1;
                           line.groupName = `Group${line.group}`;
                         }
+                        updateLineColors();
                       }}
                       class="cursor-pointer"
                     />
@@ -184,32 +213,6 @@
               </div>
             </div>
             <div class="flex flex-row justify-end items-center gap-1">
-              <button
-                title="Add Control Point"
-                on:click={() => {
-                  line.controlPoints = [
-                    ...line.controlPoints,
-                    {
-                      x: _.random(36, 108),
-                      y: _.random(36, 108),
-                    },
-                  ];
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke-width={2}
-                  class="size-5 stroke-green-500"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M12 4.5v15m7.5-7.5h-15"
-                  />
-                </svg>
-              </button>
               <button
                 title="Remove Line"
                 on:click={() => {
@@ -231,9 +234,56 @@
                   />
                 </svg>
               </button>
+              <button
+                title="Add Line After"
+                on:click={() => addLineAfter(idx)}
+                class="ml-1"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width={2}
+                  class="size-5 stroke-blue-500"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
           <div class={`h-[0.75px] w-full`} style={`background: ${line.color}`} />
+          <div class="flex flex-row justify-end items-center gap-1 mt-1">
+            <button
+              title="Add Control Point"
+              on:click={() => {
+                line.controlPoints = [
+                  ...line.controlPoints,
+                  {
+                    x: _.random(36, 108),
+                    y: _.random(36, 108),
+                  },
+                ];
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width={2}
+                class="size-5 stroke-green-500"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
+            </button>
+          </div>
           <div class="flex flex-col justify-start items-start ml-8">
             <div class="font-light">End Point:</div>
             <div class="flex flex-row justify-start items-center gap-2">

@@ -667,23 +667,39 @@
   }
 
   function updateLineColors() {
-    console.log('[updateLineColors] lines array length:', lines.length, 'lines:', lines.map(l => ({id: l.id, group: l.group, color: l.color})));
-    // Map of group number to palette index
-    let groupNumbers = Array.from(new Set(lines.map(line => line.group)));
-    groupNumbers.sort((a, b) => a - b);
-    let groupToPaletteIndex = new Map<number, number>();
-    groupNumbers.forEach((group, idx) => {
-      groupToPaletteIndex.set(group, idx % pathchainPalette.length);
+    // 1. Find the order of unique groups as they appear in lines
+    let groupOrder: number[] = [];
+    let groupMap = new Map<number, number>(); // oldGroup -> newGroupIndex
+    lines.forEach(line => {
+      if (!groupOrder.includes(line.group)) {
+        groupOrder.push(line.group);
+      }
     });
-
-    // For each group, assign groupColor and color variations
-    groupNumbers.forEach(group => {
-      const groupLines = lines.filter(line => line.group === group);
-      const groupColor = pathchainPalette[groupToPaletteIndex.get(group)!];
+    // 2. Map each old group to its new index (1-based)
+    groupOrder.forEach((oldGroup, idx) => {
+      groupMap.set(oldGroup, idx + 1);
+    });
+    // 3. Assign palette color to each group index
+    let groupToPaletteIndex = new Map<number, number>();
+    groupOrder.forEach((_, idx) => {
+      groupToPaletteIndex.set(idx + 1, idx % pathchainPalette.length);
+    });
+    // 4. Update every line's group and groupColor to match the visual order
+    lines.forEach(line => {
+      const newGroup = groupMap.get(line.group)!;
+      line.group = newGroup;
+      const groupColor = pathchainPalette[groupToPaletteIndex.get(newGroup)!];
+      line.groupColor = groupColor;
+    });
+    // 5. Update color variations within each group
+    let linesByGroup = new Map<number, Line[]>();
+    lines.forEach(line => {
+      if (!linesByGroup.has(line.group)) linesByGroup.set(line.group, []);
+      linesByGroup.get(line.group)!.push(line);
+    });
+    linesByGroup.forEach((groupLines, group) => {
       groupLines.forEach((line, idx) => {
-        line.groupColor = groupColor;
-        line.color = getColorVariation(groupColor, idx, groupLines.length);
-        console.log(`[updateLineColors] group: ${group}, idx: ${idx}, id: ${line.id}, color: ${line.color}`);
+        line.color = getColorVariation(line.groupColor, idx, groupLines.length);
       });
     });
   }
@@ -826,6 +842,78 @@
 
   // Call updateLineColors whenever lines change
   $: updateLineColors();
+
+  // Tooltip state
+  let tooltipVisible = false;
+  let tooltipText = '';
+  let tooltipX = 0;
+  let tooltipY = 0;
+
+  // Helper to check if mouse is near a line or curve
+  function isMouseNearLine(mouse: {x: number, y: number}, line: any, threshold = 8) {
+    let currentLineIdx = line.idx;
+    let _startPoint = currentLineIdx === 0 ? startPoint : lines[currentLineIdx - 1].endPoint;
+    // If the line has control points, sample the curve
+    if (line.controlPoints && line.controlPoints.length > 0) {
+      const samples = 80;
+      for (let i = 0; i < samples; ++i) {
+        const t1 = i / samples;
+        const t2 = (i + 1) / samples;
+        const p1 = getCurvePoint(t1, [_startPoint, ...line.controlPoints, line.endPoint]);
+        const p2 = getCurvePoint(t2, [_startPoint, ...line.controlPoints, line.endPoint]);
+        const x1 = x(p1.x), y1 = y(p1.y), x2 = x(p2.x), y2 = y(p2.y);
+        // Check distance from mouse to this segment
+        if (distToSegment(mouse.x, mouse.y, x1, y1, x2, y2) < threshold) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      // Straight line
+      let start = { x: x(_startPoint.x), y: y(_startPoint.y) };
+      let end = { x: x(line.endPoint.x), y: y(line.endPoint.y) };
+      return distToSegment(mouse.x, mouse.y, start.x, start.y, end.x, end.y) < threshold;
+    }
+  }
+
+  // Helper for distance to segment
+  function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+    const dot = A * C + B * D;
+    const len_sq = C * C + D * D;
+    let param = -1;
+    if (len_sq !== 0) param = dot / len_sq;
+    let xx, yy;
+    if (param < 0) { xx = x1; yy = y1; }
+    else if (param > 1) { xx = x2; yy = y2; }
+    else { xx = x1 + param * C; yy = y1 + param * D; }
+    const dx = px - xx;
+    const dy = py - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function handleFieldMouseMove(evt: MouseEvent) {
+    const rect = twoElement.getBoundingClientRect();
+    const mouse = { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    let found = false;
+    lines.forEach((line, idx) => {
+      if (isMouseNearLine(mouse, { ...line, idx })) {
+        tooltipVisible = true;
+        tooltipText = line.name;
+        tooltipX = evt.clientX + 12;
+        tooltipY = evt.clientY + 12;
+        found = true;
+      }
+    });
+    if (!found) tooltipVisible = false;
+  }
+
+  function handleFieldMouseLeave() {
+    tooltipVisible = false;
+  }
 </script>
 
 <Navbar bind:lines bind:startPoint {saveFile} {loadFile} {loadRobot}/>
@@ -837,6 +925,8 @@
       bind:this={twoElement}
       class="h-full aspect-square rounded-lg shadow-md bg-neutral-50 dark:bg-neutral-900 relative overflow-clip"
       style="position: relative;"
+      on:mousemove={handleFieldMouseMove}
+      on:mouseleave={handleFieldMouseLeave}
     >
       <img
         src="/fields/intothedeep.webp"
@@ -849,6 +939,11 @@
         alt="Robot"
         style={robotStyle}
       />
+      {#if tooltipVisible}
+        <div style="position: fixed; left: {tooltipX}px; top: {tooltipY}px; background: #222; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 14px; pointer-events: none; z-index: 1000; opacity: 0.95;">
+          {tooltipText}
+        </div>
+      {/if}
     </div>
   </div>
   <ControlTab
@@ -868,5 +963,6 @@
     {x}
     {y}
     {addNewLine}
+    {updateLineColors}
   />
 </div>
